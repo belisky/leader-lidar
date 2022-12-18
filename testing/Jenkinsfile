@@ -1,0 +1,90 @@
+pipeline{
+    agent any;
+    environment {
+        GITLAB='http://jenkins_gitlab:glpat-Vq1g_yhXpyHv5tcixr45@cb3307b24f9e/gitlab-instance-5a28c421/test_ing.git'
+
+    }
+    tools {
+        maven 'maven3.6.2'
+        jdk 'jdk_8'
+    }
+    options {
+        timestamps()
+        timeout(time:15, unit:'MINUTES')
+        gitLabConnection('jenkins_gitlab_pass')
+    }
+    stages {
+ 
+        stage(' STAGE 0 checkout'){
+            steps {
+                checkout scm;
+         
+            }
+        }
+        stage('STAGE 1 build & test'){
+            when {              
+                    
+                    branch "main"               
+                
+            }
+
+            steps {                
+                
+                sh "mvn verify"
+                
+            }
+        } 
+        stage('STAGE 2 e2e'){
+            when {           
+                    
+                    anyOf {                    
+                    branch "main"
+                    branch "release/*"
+                }
+            }
+
+            steps {                
+                 
+                sh """
+               
+                cat tests-full.txt > tests.txt
+                curl -sSf -u "admin:=[;.,lp-0oKM" \
+                     -O 'http://18.204.195.105:8082/artifactory/lidar/com/lidar/telemetry/1.0.0/telemetry-1.0.0.jar'
+                curl -sSf -u "admin:=[;.,lp-0oKM" \
+                     -O 'http://18.204.195.105:8082/artifactory/lidar/com/lidar/analytics/1.0.0/analytics-1.0.0.jar'        
+                      
+              
+                 
+                java -cp analytics-1.0.0.jar:./target/simulator-1.0.0.jar:telemetry-1.0.0.jar:. com.lidar.simulation.Simulator
+                
+                 """
+            }
+        } 
+        stage ('STAGE 3 deploy') {
+               when {            
+                    
+                    branch "main"             
+                
+                }
+
+                steps { 
+                    withMaven(maven: 'maven3.6.2', jdk: 'jdk_8', mavenSettingsConfig: 'telemetry-settings-1'){             
+                    
+                    sh "mvn deploy -DskipTests"
+                }
+            }
+        }
+    }
+    
+    post {
+            always {
+                // Cleaning workspace
+                cleanWs()
+            }
+    }
+}
+
+    
+ 
+
+ 
